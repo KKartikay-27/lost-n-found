@@ -4,6 +4,8 @@ import { Alert, Image, StyleSheet, Text, TouchableOpacity, View } from 'react-na
 import api from '../../src/api/axios';
 import Button from '../../src/components/Button';
 import { useAuth } from '../../src/context/AuthContext';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 
 export default function ItemDetail() {
   const { id } = useLocalSearchParams();
@@ -17,7 +19,7 @@ export default function ItemDetail() {
   if (!item) return null;
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <Stack.Screen options={{ title: 'Item' }} />
       {item.imageUrl && (
         <TouchableOpacity onPress={() => router.push({ pathname: '/item/image', params: { uri: item.imageUrl } })}>
@@ -73,7 +75,7 @@ export default function ItemDetail() {
           />
         </View>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 

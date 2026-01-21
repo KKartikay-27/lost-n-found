@@ -7,7 +7,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <StatusBar style="dark" hidden />
+        <StatusBar style="dark" />
         <Stack
           screenOptions={{
             headerShown: false,

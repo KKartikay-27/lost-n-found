@@ -55,7 +55,7 @@ A full-stack mobile app for reporting and finding lost items. Users can post los
 
 ### 1. Clone the repository
 ```bash
-git clone <repo-url>
+git clone https://github.com/KKartikay-27/lost-n-found
 cd lost-n-found
 ```
 
@@ -150,13 +150,3 @@ lost-n-found/
 │   └── package.json
 └── README.md
 ```
-
-## Running Tests
-
-Currently, no automated tests are included. You can manually test:
-
-- Registration/login flow
-- Posting items with images
-- Filtering items
-- Resolving/deleting own items
-- Token expiration handling

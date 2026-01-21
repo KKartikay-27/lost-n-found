@@ -1,50 +1,162 @@
-# Welcome to your Expo app 👋
+# Lost & Found App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A full-stack mobile app for reporting and finding lost items. Users can post lost or found items with images, categorize them, and mark items as resolved when recovered.
 
-## Get started
+## Features
 
-1. Install dependencies
+- **Authentication**: Secure JWT-based login/registration with case-insensitive emails.
+- **Item Management**:
+  - Post lost or found items with title, description, location, optional category, and image.
+  - View items in a feed with filters (All/Lost/Found).
+  - Pull-to-refresh on lists.
+  - View item details with poster information and full-screen image viewer.
+- **Image Upload**:
+  - Secure signed Cloudinary uploads.
+  - Choose from library or take a photo with camera.
+  - Image previews in cards and item details.
+- **User Dashboard**:
+  - View own posts (My Posts) with resolved status indicator.
+  - Profile page with post counts and resolved items.
+  - Owner actions: Mark as Resolved, Delete.
+- **UI/UX**:
+  - Consistent headers across the app.
+  - SafeAreaView support to avoid system UI overlaps.
+  - Loading states and error handling.
+  - Responsive design with modern components.
 
-   ```bash
-   npm install
-   ```
+## Tech Stack
 
-2. Start the app
+### Frontend (React Native/Expo)
+- **Framework**: Expo Router with file-based routing
+- **Language**: TypeScript
+- **State Management**: React Context (AuthContext)
+- **Storage**: AsyncStorage for token persistence
+- **UI**: React Native components, expo-image-picker, expo-status-bar
+- **HTTP**: Axios with interceptors for auth and 401 handling
+- **Image Hosting**: Cloudinary (signed uploads)
 
-   ```bash
-   npx expo start
-   ```
+### Backend (Node.js/Express)
+- **Runtime**: Node.js with ES modules
+- **Framework**: Express.js
+- **Database**: MongoDB with Mongoose ODM
+- **Auth**: JWT with bcrypt for password hashing
+- **Image Upload**: Cloudinary SDK with signature generation
+- **Validation**: Input validation and error handling
 
-In the output, you'll find options to open the app in a
+## Prerequisites
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- Node.js (v18+)
+- npm or yarn
+- MongoDB (local or cloud)
+- Expo CLI (`npx expo install`)
+- Cloudinary account (for image uploads)
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Setup
 
-## Get a fresh project
-
-When you're ready, run:
-
+### 1. Clone the repository
 ```bash
-npm run reset-project
+git clone <repo-url>
+cd lost-n-found
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 2. Backend Setup
+```bash
+cd backend
+npm install
+```
 
-## Learn more
+Create a `.env` file in `backend/`:
+```env
+MONGO_URI=mongodb://localhost:27017/lostnfound
+JWT_SECRET=your-super-secret-jwt-key
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+Start the backend:
+```bash
+npm run dev
+```
+The server runs on `http://localhost:5050`.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### 3. Frontend Setup
+```bash
+cd frontend
+npm install
+```
 
-## Join the community
+Create a `.env` file in `frontend/`:
+```env
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_UPLOAD_PRESET=your-upload-preset
+```
 
-Join our community of developers creating universal apps.
+Update `app.config.ts` to include any additional Expo extras if needed.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Start the frontend:
+```bash
+npx expo start
+```
+Scan the QR code with Expo Go (Android) or the Camera app (iOS).
+
+## API Endpoints
+
+### Auth
+- `POST /api/auth/register` – Register a new user
+- `POST /api/auth/login` – Login a user
+- `GET /api/auth/verify` – Verify token and get user data
+
+### Items
+- `GET /api/items` – Get all unresolved items (optional `?type=lost|found`)
+- `GET /api/items/my-items` – Get current user’s items
+- `GET /api/items/:id` – Get item details
+- `POST /api/items` – Create a new item
+- `PATCH /api/items/:id/resolve` – Mark item as resolved
+- `DELETE /api/items/:id` – Delete an item (owner only)
+
+### Upload
+- `POST /api/upload/sign` – Get Cloudinary signed upload params (auth required)
+
+## Project Structure
+
+```
+lost-n-found/
+├── backend/
+│   ├── src/
+│   │   ├── controllers/
+│   │   ├── middleware/
+│   │   ├── models/
+│   │   ├── routes/
+│   │   ├── config/
+│   │   └── server.js
+│   ├── .env.example
+│   └── package.json
+├── frontend/
+│   ├── app/
+│   │   ├── (auth)/
+│   │   ├── (tabs)/
+│   │   ├── item/
+│   │   ├── _layout.tsx
+│   │   └── index.tsx
+│   ├── src/
+│   │   ├── api/
+│   │   ├── components/
+│   │   ├── context/
+│   │   ├── constants/
+│   │   ├── utils/
+│   │   └── config/
+│   ├── app.config.ts
+│   └── package.json
+└── README.md
+```
+
+## Running Tests
+
+Currently, no automated tests are included. You can manually test:
+
+- Registration/login flow
+- Posting items with images
+- Filtering items
+- Resolving/deleting own items
+- Token expiration handling

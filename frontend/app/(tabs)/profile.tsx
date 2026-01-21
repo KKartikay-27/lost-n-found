@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import api from '../../src/api/axios';
 import Button from '../../src/components/Button';
 import { Colors } from '../../src/constants/theme';
@@ -11,6 +11,7 @@ export default function Profile() {
   const { user, logout } = useAuth();
   const [myCount, setMyCount] = useState(0);
   const [resolvedCount, setResolvedCount] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   const initials = useMemo(() => {
     const n = user?.name || '';
@@ -18,17 +19,24 @@ export default function Profile() {
     return parts.slice(0, 2).map((p: string) => p[0]?.toUpperCase()).join('') || 'U';
   }, [user]);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await api.get('/items/my-items');
-        const items = Array.isArray(res.data) ? res.data : [];
-        setMyCount(items.length);
-        setResolvedCount(items.filter((item: any) => item.isResolved).length);
-      } catch {}
-    };
-    load();
+  const load = useCallback(async () => {
+    try {
+      const res = await api.get('/items/my-items');
+      const items = Array.isArray(res.data) ? res.data : [];
+      setMyCount(items.length);
+      setResolvedCount(items.filter((item: any) => item.isResolved).length);
+    } catch {}
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
 
   const handleLogout = async () => {
     await logout();
@@ -36,7 +44,9 @@ export default function Profile() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} refreshControl={
+      <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+    }>
       <View style={styles.headerCard}>
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{initials}</Text>
@@ -72,7 +82,7 @@ export default function Profile() {
       <View style={{ marginTop: 16 }}>
         <Button title="Logout" variant="danger" onPress={handleLogout} />
       </View>
-    </View>
+    </ScrollView>
   );
 }
 

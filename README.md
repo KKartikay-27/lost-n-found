@@ -2,7 +2,34 @@
 
 A full-stack mobile app for reporting and finding lost items. Users can post lost or found items with images, categorize them, and mark items as resolved when recovered.
 
-## Features
+## Problem Statement
+
+People often lose personal belongings or find items that others have lost. This app bridges that gap by allowing users to:
+- Report lost items with details and photos
+- Report found items to help return them
+- Browse and search through listings
+- Contact and coordinate returns
+
+## Tech Stack Used
+
+### Frontend (React Native/Expo)
+- **Framework**: Expo Router with file-based routing
+- **Language**: TypeScript
+- **State Management**: React Context (AuthContext)
+- **Storage**: AsyncStorage for token persistence
+- **UI**: React Native components, expo-image-picker, expo-status-bar
+- **HTTP**: Axios with interceptors for auth and 401 handling
+- **Image Hosting**: Cloudinary (signed uploads)
+
+### Backend (Node.js/Express)
+- **Runtime**: Node.js with ES modules
+- **Framework**: Express.js
+- **Database**: MongoDB with Mongoose ODM
+- **Auth**: JWT with bcrypt for password hashing
+- **Image Upload**: Cloudinary SDK with signature generation
+- **Validation**: Input validation and error handling
+
+## Features Implemented
 
 - **Authentication**: Secure JWT-based login/registration with case-insensitive emails.
 - **Item Management**:
@@ -24,34 +51,15 @@ A full-stack mobile app for reporting and finding lost items. Users can post los
   - Loading states and error handling.
   - Responsive design with modern components.
 
-## Tech Stack
+## How to Run the Project Locally
 
-### Frontend (React Native/Expo)
-- **Framework**: Expo Router with file-based routing
-- **Language**: TypeScript
-- **State Management**: React Context (AuthContext)
-- **Storage**: AsyncStorage for token persistence
-- **UI**: React Native components, expo-image-picker, expo-status-bar
-- **HTTP**: Axios with interceptors for auth and 401 handling
-- **Image Hosting**: Cloudinary (signed uploads)
-
-### Backend (Node.js/Express)
-- **Runtime**: Node.js with ES modules
-- **Framework**: Express.js
-- **Database**: MongoDB with Mongoose ODM
-- **Auth**: JWT with bcrypt for password hashing
-- **Image Upload**: Cloudinary SDK with signature generation
-- **Validation**: Input validation and error handling
-
-## Prerequisites
+### Prerequisites
 
 - Node.js (v18+)
 - npm or yarn
 - MongoDB (local or cloud)
 - Expo CLI (`npx expo install`)
 - Cloudinary account (for image uploads)
-
-## Setup
 
 ### 1. Clone the repository
 ```bash
@@ -100,14 +108,14 @@ npx expo start
 ```
 Scan the QR code with Expo Go (Android) or the Camera app (iOS).
 
-## API Endpoints
+## Basic API Documentation
 
-### Auth
+### Authentication Endpoints
 - `POST /api/auth/register` – Register a new user
 - `POST /api/auth/login` – Login a user
 - `GET /api/auth/verify` – Verify token and get user data
 
-### Items
+### Item Endpoints
 - `GET /api/items` – Get all unresolved items (optional `?type=lost|found`)
 - `GET /api/items/my-items` – Get current user’s items
 - `GET /api/items/:id` – Get item details
@@ -115,7 +123,7 @@ Scan the QR code with Expo Go (Android) or the Camera app (iOS).
 - `PATCH /api/items/:id/resolve` – Mark item as resolved
 - `DELETE /api/items/:id` – Delete an item (owner only)
 
-### Upload
+### Upload Endpoint
 - `POST /api/upload/sign` – Get Cloudinary signed upload params (auth required)
 
 ## Project Structure

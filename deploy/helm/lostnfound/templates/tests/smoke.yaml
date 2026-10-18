@@ -1,0 +1,39 @@
+# `helm test` runs the core user journey against the in-cluster Service.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "lostnfound.name" . }}-smoke
+  labels:
+    {{- include "lostnfound.labels" . | nindent 4 }}
+    lostnfound-client: "true"
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 100
+    seccompProfile: { type: RuntimeDefault }
+  containers:
+    - name: smoke
+      image: curlimages/curl:8.10.1
+      securityContext: {{- include "lostnfound.restrictedSecurityContext" . | nindent 8 }}
+      env:
+        - name: BASE
+          value: http://{{ include "lostnfound.name" . }}-api
+        - name: EXPECTED_VERSION
+          value: {{ include "lostnfound.imageTag" . | quote }}
+      command: ["/bin/sh", "-ec"]
+      args:
+        - |
+          curl -fsS "$BASE/version" | tee /dev/stderr | grep -q "$EXPECTED_VERSION"
+          EMAIL="smoke-$(date +%s)@example.com"
+          TOKEN=$(curl -fsS -X POST "$BASE/api/auth/register" -H 'Content-Type: application/json' \
+            -d "{\"name\":\"Smoke\",\"email\":\"$EMAIL\",\"password\":\"smoke-pass-1\"}" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+          test -n "$TOKEN"
+          curl -fsS -X POST "$BASE/api/items" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+            -d '{"title":"Smoke umbrella","description":"helm test","type":"found","location":"Gate 1"}' >/dev/null
+          curl -fsS "$BASE/api/items?type=found" | grep -q "Smoke umbrella"
+          echo "smoke test passed"

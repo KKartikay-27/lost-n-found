@@ -1,0 +1,64 @@
+# Defaults describe the local kind environment. Override per environment with
+# a small values file (see values-ci.yaml) instead of copying manifests.
+
+image:
+  repository: ghcr.io/kkartikay-27/lostnfound-api
+  # CI sets this to the commit SHA; never deploy a moving tag like "latest".
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# Kubernetes Secret holding MONGO_URI, JWT_SECRET, MONGO_ROOT_USERNAME,
+# MONGO_ROOT_PASSWORD and optional CLOUDINARY_* keys. Created out-of-band by
+# scripts/create-secrets.sh so no secret value ever lives in this repo.
+existingSecret: lostnfound-secrets
+
+api:
+  replicaCount: 2
+  port: 5050
+  logLevel: info
+  corsOrigin: "*"
+  authRateLimit: 20
+  features:
+    itemSearch: false
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+  pdb:
+    minAvailable: 1
+
+ingress:
+  enabled: true
+  className: nginx
+  host: lostnfound.localtest.me
+
+tracing:
+  # OTLP/HTTP endpoint; empty disables tracing.
+  otlpEndpoint: "http://jaeger-collector.observability:4318"
+
+mongo:
+  image: mongo:7.0.14
+  storage: 1Gi
+  storageClass: ""
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: "1", memory: 512Mi }
+
+networkPolicy:
+  enabled: true
+  ingressNamespace: ingress-nginx
+  monitoringNamespace: monitoring
+  observabilityNamespace: observability
+
+monitoring:
+  # Requires the Prometheus Operator CRDs (kube-prometheus-stack).
+  serviceMonitor: true
+  prometheusRules: true
+  grafanaDashboard: true
+  slo:
+    availability: 0.99
+    latencyP95Seconds: 0.5

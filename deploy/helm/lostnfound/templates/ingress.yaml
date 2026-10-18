@@ -1,0 +1,23 @@
+{{- if .Values.ingress.enabled }}
+# Only user-facing paths are routed. /metrics and /readyz stay cluster-internal,
+# and MongoDB has no route at all.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "lostnfound.name" . }}-api
+  labels: {{- include "lostnfound.labels" . | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          {{- range list "/api" "/healthz" "/version" }}
+          - path: {{ . }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "lostnfound.name" $ }}-api
+                port: { name: http }
+          {{- end }}
+{{- end }}

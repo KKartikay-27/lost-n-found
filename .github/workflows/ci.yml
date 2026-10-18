@@ -1,0 +1,150 @@
+# Source change -> checks -> immutable image -> scanned -> proven deployable on Kubernetes.
+# Every image is tagged with the 7-char commit SHA, which the running app reports at /version.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Least privilege by default; jobs opt in to more.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/kkartikay-27/lostnfound-api
+
+jobs:
+  test:
+    name: lint, test, audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - name: dependency audit (production deps, fail on high)
+        run: npm audit --omit=dev --audit-level=high
+
+  secrets:
+    name: secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: gitleaks (full history)
+        run: |
+          docker run --rm -v "$PWD:/repo" \
+            zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
+            git /repo --redact --verbose
+
+  chart:
+    name: helm lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+      - run: helm lint deploy/helm/lostnfound
+      - run: helm lint deploy/helm/lostnfound -f deploy/helm/lostnfound/values-ci.yaml
+      - name: trivy config scan (chart + Dockerfile misconfigurations)
+        run: |
+          docker run --rm -v "$PWD:/src" \
+            aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa \
+            config --severity HIGH,CRITICAL --exit-code 1 --skip-dirs /src/frontend /src
+
+  image:
+    name: build, scan, push image
+    needs: [test, secrets, chart]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: meta
+        run: |
+          # On PRs github.sha is a merge commit; tag with the PR head so the image matches the reviewed commit.
+          SHA="${{ github.event.pull_request.head.sha || github.sha }}"
+          echo "tag=${SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "built=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: backend
+          load: true
+          tags: ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
+          build-args: |
+            GIT_SHA=${{ steps.meta.outputs.tag }}
+            APP_VERSION=${{ steps.meta.outputs.tag }}
+            BUILD_TIME=${{ steps.meta.outputs.built }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: trivy image scan (fail on fixable HIGH/CRITICAL)
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa \
+            image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
+            ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
+      - name: save image for the deploy test
+        run: docker save ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }} -o /tmp/image.tar
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image
+          path: /tmp/image.tar
+          retention-days: 1
+      # Forks cannot get a write token, so only same-repo events publish.
+      - name: push to GHCR
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker push ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
+
+  deploy-test:
+    name: deploy to ephemeral kind + helm test
+    needs: image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: image
+          path: /tmp
+      - uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
+        with:
+          cluster_name: ci
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+      - name: load image
+        run: |
+          docker load -i /tmp/image.tar
+          kind load docker-image ${{ env.IMAGE }}:${{ needs.image.outputs.tag }} --name ci
+      - name: install chart (atomic)
+        run: |
+          scripts/create-secrets.sh
+          helm upgrade --install lostnfound deploy/helm/lostnfound -n lostnfound \
+            -f deploy/helm/lostnfound/values-ci.yaml \
+            --set image.tag=${{ needs.image.outputs.tag }} \
+            --atomic --wait --timeout 5m
+      - name: helm test (user journey + version check)
+        run: helm test lostnfound -n lostnfound --logs
+      - name: diagnostics on failure
+        if: failure()
+        run: |
+          kubectl -n lostnfound get all,events
+          kubectl -n lostnfound logs -l app.kubernetes.io/name=lostnfound-api --tail=100 || true

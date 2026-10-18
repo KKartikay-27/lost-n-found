@@ -1,0 +1,27 @@
+# Trimmed for a laptop: Prometheus, Alertmanager, Grafana, kube-state-metrics, node-exporter.
+grafana:
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      searchNamespace: ALL
+prometheus:
+  prometheusSpec:
+    # Pick up ServiceMonitors/PrometheusRules from any namespace and release.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    retention: 2d
+    resources:
+      requests: { cpu: 100m, memory: 400Mi }
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests: { cpu: 10m, memory: 32Mi }
+kubeEtcd: { enabled: false }
+kubeControllerManager: { enabled: false }
+kubeScheduler: { enabled: false }
+kubeProxy: { enabled: false }

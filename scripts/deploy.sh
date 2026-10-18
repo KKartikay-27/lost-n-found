@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Deploys one immutable image version to the local cluster.
 #
-#   scripts/deploy.sh <git-sha>            pull ghcr.io/...:<sha> built by CI (default)
+#   scripts/deploy.sh <git-sha>            pull ghcr.io/...:<sha> built by CI (default;
+#                                          needs `gh auth token | docker login ghcr.io -u <user> --password-stdin`)
 #   scripts/deploy.sh <git-sha> --local    build the image locally and load it into kind
 #
 # The release gate is CI: by default the script refuses a commit whose pipeline
@@ -33,6 +34,12 @@ else
     echo "CI for $TAG is '${CONCLUSION:-not found}'. Refusing to deploy (set SKIP_CI_CHECK=1 to override)." >&2
     exit 1
   fi
+  # The GHCR package is private: pull with the operator's own registry login and
+  # load into kind, so no registry credential has to be stored in the cluster.
+  echo "==> pulling $REPO:$TAG"
+  docker pull -q "$REPO:$TAG" >/dev/null
+  kind load docker-image "$REPO:$TAG" --name lostnfound >/dev/null
+  EXTRA+=(--set image.pullPolicy=Never)
 fi
 
 NAMESPACE=$NAMESPACE RELEASE=$RELEASE scripts/create-secrets.sh

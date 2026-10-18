@@ -5,12 +5,15 @@ All evidence comes from this project running on the local kind cluster (`kind-lo
 
 ## Tested version
 
+The final commit can't contain its own CI run and deployment output, so that evidence
+is posted on the PR:
+
 | | |
 |---|---|
-| Final commit | `FINAL_SHA` |
-| CI run for that commit | CI_RUN_URL |
-| Image | `ghcr.io/kkartikay-27/lostnfound-api:FINAL_SHA7` |
-| Deployed + verified | [`final-deploy.txt`](evidence/final-deploy.txt): CI-gated `scripts/deploy.sh`, `helm test`, `/version` = `FINAL_SHA7`, ingress user journey |
+| Final commit | head of [PR #1](https://github.com/KKartikay-27/lost-n-found/pull/1) |
+| CI run, deployed version, user journey | the **"Final verification"** comment on PR #1: CI run link for that SHA, CI-gated `scripts/deploy.sh <sha>`, `helm test`, `/version` = SHA, and the ingress user journey |
+| Image | `ghcr.io/kkartikay-27/lostnfound-api:<sha7>`, built and scanned by CI |
+| Earlier CI run on this branch | https://github.com/KKartikay-27/lost-n-found/actions/runs/39135653192 (all 5 jobs green) |
 
 ## Source → delivery → runtime → user journey
 
@@ -34,7 +37,7 @@ All evidence comes from this project running on the local kind cluster (`kind-lo
 
 *These demos ran before the final commits on image `984b98f`, a local build of
 the same application code before its commits were re-authored. The final commit's
-image is verified separately in `final-deploy.txt`.*
+image is verified separately in the PR's final verification comment.*
 
 ## Fault and recovery — [`fault-mongodb-outage.txt`](evidence/fault-mongodb-outage.txt)
 

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Student | Kumar Kartikay — `<STUDENT_ID>` |
+| Student | Kumar Kartikay |
 | Project | Lost & Found — DevOps for a personal full-stack app |
 | Repository | https://github.com/KKartikay-27/lost-n-found |
 | Baseline commit | [`d484255e0c36018eb4650d1921ed53024f7ed018`](https://github.com/KKartikay-27/lost-n-found/commit/d484255e0c36018eb4650d1921ed53024f7ed018) (also tagged `baseline`) |

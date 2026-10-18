@@ -25,6 +25,7 @@ macOS or Linux with Docker (Docker Desktop: ≥ 4 CPUs / 8 GB RAM for the full m
 
 ```bash
 make cluster                  # kind cluster + ingress-nginx, metrics-server, Prometheus/Grafana/Alertmanager, Jaeger
+gh auth token | docker login ghcr.io -u <github-user> --password-stdin   # once, to pull CI images
 make deploy SHA=<commit>      # deploy the image CI built for <commit> (refuses if that commit's CI failed)
 # or, without GHCR/CI:
 make deploy-local             # build the current commit locally, load into kind, deploy

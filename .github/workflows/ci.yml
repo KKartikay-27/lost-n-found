@@ -58,6 +58,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.1
       - run: helm lint deploy/helm/lostnfound
       - run: helm lint deploy/helm/lostnfound -f deploy/helm/lostnfound/values-ci.yaml
       - name: trivy config scan (chart + Dockerfile misconfigurations)
@@ -130,17 +132,19 @@ jobs:
         with:
           cluster_name: ci
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.1
       - name: load image
         run: |
           docker load -i /tmp/image.tar
           kind load docker-image ${{ env.IMAGE }}:${{ needs.image.outputs.tag }} --name ci
-      - name: install chart (atomic)
+      - name: install chart (rollback on failure)
         run: |
           scripts/create-secrets.sh
           helm upgrade --install lostnfound deploy/helm/lostnfound -n lostnfound \
             -f deploy/helm/lostnfound/values-ci.yaml \
             --set image.tag=${{ needs.image.outputs.tag }} \
-            --atomic --wait --timeout 5m
+            --rollback-on-failure --wait --timeout 5m
       - name: helm test (user journey + version check)
         run: helm test lostnfound -n lostnfound --logs
       - name: diagnostics on failure

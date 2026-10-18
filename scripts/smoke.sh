@@ -2,7 +2,7 @@
 # End-to-end user journey through the ingress, as a real client would hit it.
 set -euo pipefail
 BASE=${BASE:-http://lostnfound.localtest.me:8080}
-EMAIL="demo-$(date +%s)@example.com"
+EMAIL="demo-$(date +%s)-$RANDOM@example.com"
 
 echo "GET  /version";        curl -fsS "$BASE/version"; echo
 echo "GET  /healthz";        curl -fsS "$BASE/healthz"; echo

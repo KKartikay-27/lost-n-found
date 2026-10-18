@@ -49,6 +49,23 @@ spec:
       ports:
         - { protocol: TCP, port: 4318 }
 ---
+# In-namespace clients (the helm test pod) may only reach the API.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "lostnfound.name" . }}-clients
+  labels: {{- include "lostnfound.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: { lostnfound-client: "true" }
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: {{- include "lostnfound.apiSelector" . | nindent 14 }}
+      ports:
+        - { protocol: TCP, port: {{ .Values.api.port }} }
+---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

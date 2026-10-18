@@ -1,0 +1,39 @@
+# Release control demo — 2026-10-18T14:06:42Z
+
+Live traffic probe: one request to /api/items every 0.2s for the whole rollout.
+
+## 1. Bad release (bad0001: crashes on start-up, missing config) — automatic rollback
+$ helm upgrade lostnfound deploy/helm/lostnfound --reuse-values --set image.tag=bad0001 --set image.pullPolicy=Never --rollback-on-failure --wait --timeout 60s
+Error: UPGRADE FAILED: release lostnfound failed, and has been rolled back due to rollback-on-failure being set: resource Deployment/lostnfound/lostnfound-api not ready. status: InProgress, message: Updated: 1/2
+context deadline exceeded
+
+$ kubectl logs (crashing pod, captured during rollout via previous container)
+Back-off restarting failed container api in pod lostnfound-api-6d6545c644-hg2t7_lostnfound(7b849872-8376-4be0-882e-046fca133d68)
+
+Traffic during the failed rollout: 445 succeeded, 0 failed (maxUnavailable=0 kept the old ReplicaSet serving).
+
+$ helm history lostnfound
+REVISION	UPDATED                 	STATUS    	CHART           	APP VERSION	DESCRIPTION                                                                                                                    
+1       	Sun Oct 18 19:31:20 2026	superseded	lostnfound-0.1.0	0.1.0      	deploy 984b98f                                                                                                                 
+2       	Sun Oct 18 19:34:49 2026	superseded	lostnfound-0.1.0	0.1.0      	netpol: allow test clients                                                                                                     
+3       	Sun Oct 18 19:35:48 2026	superseded	lostnfound-0.1.0	0.1.0      	bad release: wrong port                                                                                                        
+4       	Sun Oct 18 19:36:21 2026	superseded	lostnfound-0.1.0	0.1.0      	Rollback to 2                                                                                                                  
+5       	Sun Oct 18 19:36:42 2026	failed    	lostnfound-0.1.0	0.1.0      	Upgrade "lostnfound" failed: resource Deployment/lostnfound/lostnfound-api not ready. status: InProgress, message: Updated: ...
+6       	Sun Oct 18 19:37:42 2026	deployed  	lostnfound-0.1.0	0.1.0      	Rollback to 4                                                                                                                  
+
+$ curl /version
+{"version":"984b98f","commit":"984b98f","builtAt":"2026-10-18T14:01:08Z"}
+
+## 2. Manual rollback to a known revision
+Revision 3 changed api.port; revision 4 rolled it back with:
+$ helm rollback lostnfound 2 --wait
+
+## 3. Feature flag: item search ships dark, enabled/disabled without a new image
+$ helm upgrade lostnfound --reuse-values --set api.features.itemSearch=false
+REVISION: 8
+$ curl "/api/items"            -> 2 items: ['Black wallet', 'Smoke umbrella']
+$ curl "/api/items?q=umbrella" -> 2 items: ['Black wallet', 'Smoke umbrella']   (flag off: q ignored)
+$ helm upgrade lostnfound --reuse-values --set api.features.itemSearch=true   (ConfigMap checksum annotation rolls the pods)
+REVISION: 9
+$ curl "/api/items?q=umbrella" -> 1 items: ['Smoke umbrella']   (flag on: filtered)
+Same image ({"version":"984b98f","commit":"984b98f","builtAt":"2026-10-18T14:01:08Z"}) throughout; the flag is the kill switch.

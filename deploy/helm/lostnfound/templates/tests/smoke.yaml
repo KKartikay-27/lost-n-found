@@ -29,7 +29,7 @@ spec:
       args:
         - |
           curl -fsS "$BASE/version" | tee /dev/stderr | grep -q "$EXPECTED_VERSION"
-          EMAIL="smoke-$(date +%s)@example.com"
+          EMAIL="smoke-$(date +%s)-$RANDOM@example.com"
           TOKEN=$(curl -fsS -X POST "$BASE/api/auth/register" -H 'Content-Type: application/json' \
             -d "{\"name\":\"Smoke\",\"email\":\"$EMAIL\",\"password\":\"smoke-pass-1\"}" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
           test -n "$TOKEN"

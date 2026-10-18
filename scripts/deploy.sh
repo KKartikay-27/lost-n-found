@@ -5,7 +5,7 @@
 #   scripts/deploy.sh <git-sha> --local    build the image locally and load it into kind
 #
 # The release gate is CI: by default the script refuses a commit whose pipeline
-# did not succeed. helm --atomic rolls back automatically if pods never become ready.
+# did not succeed. helm --rollback-on-failure rolls back automatically if pods never become ready.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -43,7 +43,7 @@ helm upgrade --install "$RELEASE" deploy/helm/lostnfound \
   --set image.tag="$TAG" \
   "${EXTRA[@]}" \
   --description "deploy $TAG" \
-  --atomic --wait --timeout 5m
+  --rollback-on-failure --wait --timeout 5m
 
 echo "==> helm test"
 helm test "$RELEASE" -n "$NAMESPACE" --logs | tail -3

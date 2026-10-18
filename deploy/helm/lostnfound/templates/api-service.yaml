@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "lostnfound.name" . }}-api
+  labels:
+    {{- include "lostnfound.labels" . | nindent 4 }}
+    {{- include "lostnfound.apiSelector" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector: {{- include "lostnfound.apiSelector" . | nindent 4 }}
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

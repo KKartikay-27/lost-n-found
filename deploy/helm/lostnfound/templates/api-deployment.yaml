@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "lostnfound.name" . }}-api
+  labels:
+    {{- include "lostnfound.labels" . | nindent 4 }}
+    {{- include "lostnfound.apiSelector" . | nindent 4 }}
+    app.kubernetes.io/version: {{ include "lostnfound.imageTag" . | quote }}
+spec:
+  {{- if not .Values.api.autoscaling.enabled }}
+  replicas: {{ .Values.api.replicaCount }}
+  {{- end }}
+  revisionHistoryLimit: 5
+  # Rolling update that never drops below desired capacity: a new pod must pass
+  # readiness before an old one is removed, so a broken image stalls instead of serving.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels: {{- include "lostnfound.apiSelector" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "lostnfound.apiSelector" . | nindent 8 }}
+        app.kubernetes.io/version: {{ include "lostnfound.imageTag" . | quote }}
+      annotations:
+        # Config changes roll the pods; env vars are only read at start-up.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "lostnfound.name" . }}
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile: { type: RuntimeDefault }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: {{- include "lostnfound.apiSelector" . | nindent 14 }}
+      containers:
+        - name: api
+          image: "{{ .Values.image.repository }}:{{ include "lostnfound.imageTag" . }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.api.port }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "lostnfound.name" . }}-api
+          env:
+            - name: PORT
+              value: {{ .Values.api.port | quote }}
+            - name: MONGO_URI
+              valueFrom: { secretKeyRef: { name: {{ .Values.existingSecret }}, key: MONGO_URI } }
+            - name: JWT_SECRET
+              valueFrom: { secretKeyRef: { name: {{ .Values.existingSecret }}, key: JWT_SECRET } }
+            {{- range list "CLOUDINARY_CLOUD_NAME" "CLOUDINARY_API_KEY" "CLOUDINARY_API_SECRET" }}
+            - name: {{ . }}
+              valueFrom: { secretKeyRef: { name: {{ $.Values.existingSecret }}, key: {{ . }}, optional: true } }
+            {{- end }}
+          # Liveness only checks the process; readiness also checks MongoDB so a
+          # database outage removes pods from the Service without restarting them.
+          startupProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 2
+            failureThreshold: 15
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 2
+          lifecycle:
+            # Give the ingress time to drop this endpoint before the process stops accepting.
+            preStop:
+              sleep: { seconds: 5 }
+          resources: {{- toYaml .Values.api.resources | nindent 12 }}
+          securityContext: {{- include "lostnfound.restrictedSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

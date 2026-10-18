@@ -1,0 +1,18 @@
+# Ephemeral cluster inside GitHub Actions: image is loaded into kind, no
+# monitoring stack, single replica to fit the runner.
+image:
+  pullPolicy: Never
+api:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+  pdb:
+    minAvailable: 0
+tracing:
+  otlpEndpoint: ""
+networkPolicy:
+  enabled: false
+monitoring:
+  serviceMonitor: false
+  prometheusRules: false
+  grafanaDashboard: false

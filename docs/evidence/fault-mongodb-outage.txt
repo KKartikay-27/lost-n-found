@@ -1,0 +1,33 @@
+# Fault injection: MongoDB outage — 2026-10-18T14:09:21Z
+
+## Before
+items stored: 2   readyz pods: 10.244.1.17 10.244.2.13
+alerts: none
+
+## Inject: stop the database
+$ kubectl -n lostnfound scale statefulset lostnfound-mongo --replicas=0
+
+## Symptom (user view)
+$ curl -i http://lostnfound.localtest.me:8080/api/items -> HTTP 503
+
+## Evidence
+API pods: lostnfound-api-84d7c845d6-tgb7j ready=0/1 restarts=0;lostnfound-api-84d7c845d6-vbv7k ready=0/1 restarts=0;   # gitleaks:allow (pod names, not a secret)
+Service endpoints (ready): ''
+In-cluster /readyz: command terminated with exit code 1
+App log: {"level":40,"time":1792332561750,"service":"lostnfound-api","msg":"MongoDB disconnected"}
+Interpretation: liveness (/healthz) still passes so pods are NOT restarted; readiness fails, so
+Kubernetes pulls them from the Service and the ingress returns 503 instead of hanging or 500s.
+Waiting for alert evaluation (for: 2m)...
+kube_statefulset_status_replicas_ready{statefulset=lostnfound-mongo} = 0
+alerts: LostnfoundApiUnavailable=firing, LostnfoundMongoDown=firing
+
+## Fix
+$ kubectl -n lostnfound scale statefulset lostnfound-mongo --replicas=1
+
+## Verify recovery
+$ curl http://lostnfound.localtest.me:8080/api/items -> HTTP 200, items stored: 2 (same as before: data survived on the PVC)
+API restarts: 0 0 (no restarts — readiness handled it)
+App log: {"level":30,"time":1792332741841,"service":"lostnfound-api","msg":"MongoDB reconnected"}
+smoke.sh: full user journey passes
+alerts (resolve after next evaluation): LostnfoundApiUnavailable=firing, LostnfoundMongoDown=firing
+Alerts after the next evaluation (14:13:56Z): none — both resolved

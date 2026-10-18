@@ -1,28 +1,33 @@
-import cors from 'cors';
-import dotenv from 'dotenv';
-import express from 'express';
-import { connectDB } from './config/db.js';
-import { getMyItems } from './controllers/item.controller.js';
-import auth from './middleware/auth.middleware.js';
-import authRoutes from './routes/auth.routes.js';
-import itemRoutes from './routes/item.routes.js';
-import uploadRoutes from './routes/upload.routes.js';
+import app from './app.js';
+import { connectDB, disconnectDB } from './config/db.js';
+import { buildInfo, loadConfig } from './config/env.js';
+import logger from './logger.js';
 
-dotenv.config();
-connectDB();
+const config = loadConfig();
 
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-app.use('/api/auth', authRoutes);
-app.use('/api/items', itemRoutes);
-app.use('/api/upload', uploadRoutes);
-
-// Compatibility route to support clients calling /api/my-items
-app.get('/api/my-items', auth, getMyItems);
-
-const PORT = process.env.PORT || 5050;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+const server = app.listen(config.port, () => {
+  logger.info({ port: config.port, ...buildInfo }, 'server listening');
 });
+
+// Start serving immediately; /readyz stays 503 until Mongo is reachable, so Kubernetes holds traffic.
+const connectWithRetry = async () => {
+  try {
+    await connectDB(config.mongoUri);
+  } catch (err) {
+    logger.error({ err: err.message }, 'MongoDB connection failed, retrying in 5s');
+    setTimeout(connectWithRetry, 5000);
+  }
+};
+connectWithRetry();
+
+// Kubernetes sends SIGTERM on rollout/eviction: stop accepting, drain in-flight requests, then exit.
+const shutdown = (signal) => {
+  logger.info({ signal }, 'shutting down');
+  server.close(async () => {
+    await disconnectDB().catch(() => {});
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 10000).unref();
+};
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

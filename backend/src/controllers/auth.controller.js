@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { authAttempts } from '../metrics.js';
 import User from '../models/User.js';
 
 export const register = async (req, res) => {
@@ -10,11 +11,15 @@ export const register = async (req, res) => {
     }
     const normalizedEmail = String(email).toLowerCase().trim();
     const existing = await User.findOne({ email: normalizedEmail });
-    if (existing) return res.status(409).json({ message: 'Email already registered' });
+    if (existing) {
+      authAttempts.inc({ action: 'register', outcome: 'conflict' });
+      return res.status(409).json({ message: 'Email already registered' });
+    }
     const hash = await bcrypt.hash(password, 10);
     const user = await User.create({ name, email: normalizedEmail, passwordHash: hash, phone });
     const safeUser = { id: user._id, name: user.name, email: user.email, phone: user.phone, createdAt: user.createdAt };
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    authAttempts.inc({ action: 'register', outcome: 'success' });
     res.status(201).json({ token, user: safeUser });
   } catch (err) {
     res.status(400).json({ message: 'Registration failed', error: err.message });
@@ -27,13 +32,15 @@ export const login = async (req, res) => {
     if (!email || !password) return res.status(400).json({ message: 'Email and password are required' });
     const normalizedEmail = String(email).toLowerCase().trim();
     const user = await User.findOne({ email: normalizedEmail });
-    if (!user) return res.sendStatus(401);
-
-    const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) return res.sendStatus(401);
+    const valid = user && await bcrypt.compare(password, user.passwordHash);
+    if (!valid) {
+      authAttempts.inc({ action: 'login', outcome: 'failure' });
+      return res.sendStatus(401);
+    }
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
     const safeUser = { id: user._id, name: user.name, email: user.email, phone: user.phone, createdAt: user.createdAt };
+    authAttempts.inc({ action: 'login', outcome: 'success' });
     res.json({ token, user: safeUser });
   } catch (err) {
     res.status(400).json({ message: 'Login failed', error: err.message });

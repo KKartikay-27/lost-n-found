@@ -1,0 +1,20 @@
+# Local cluster: one control plane (also runs ingress) and two workers so
+# anti-affinity and PodDisruptionBudgets have somewhere to spread pods.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: lostnfound
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 8080
+        listenAddress: "127.0.0.1"
+        protocol: TCP
+  - role: worker
+  - role: worker

@@ -1,3 +1,5 @@
+import { features } from '../config/features.js';
+import { itemsCreated } from '../metrics.js';
 import Item from '../models/Item.js';
 
 export const createItem = async (req, res) => {
@@ -15,6 +17,7 @@ export const createItem = async (req, res) => {
       imageUrl: req.body.imageUrl,
       postedBy: req.user.id,
     });
+    itemsCreated.inc({ type: item.type });
     res.status(201).json(item);
   } catch (err) {
     res.status(400).json({ message: 'Unable to create item', error: err.message });
@@ -25,7 +28,13 @@ export const getItems = async (req, res) => {
   try {
     const filter = { isResolved: false };
     if (req.query.type) {
-      filter.type = req.query.type.toLowerCase();
+      filter.type = String(req.query.type).toLowerCase();
+    }
+    // Text search ships dark behind a flag so it can be enabled or disabled without a new image.
+    if (features.itemSearch && req.query.q) {
+      const escaped = String(req.query.q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pattern = new RegExp(escaped, 'i');
+      filter.$or = [{ title: pattern }, { description: pattern }, { location: pattern }];
     }
     // Show both lost and found items to all users
     const items = await Item.find(filter).sort({ createdAt: -1 });
